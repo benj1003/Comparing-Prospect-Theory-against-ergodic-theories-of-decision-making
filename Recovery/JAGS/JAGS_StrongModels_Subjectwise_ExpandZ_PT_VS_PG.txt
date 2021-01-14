@@ -1,0 +1,233 @@
+##COMMENTS----------------------------------------------------------------
+
+# Which is best model for each subject out of the following strong models:
+#
+# Prospect Theory (p) where utility is free to vary over individuals according to PT – As used in Meder et al. 2019
+# Prospect Theory (pg) where probability weighting is not omitted, and everything is considered gains – as suggested by Wakker et. al
+#
+# Note that the model indicator variable z, is parameter expanded to take on 12 different values rather than 3. This
+# allows better convergence. It allows four different values of the indicator variable to map to each utility
+# model, such that a z of 1,3,5,7 maps to the model introduced in Meder et. al, 2,4,6,8 map to version suggested by Wakker et. al, and 3,5,9,12 map to the model that
+# also considers probability weighting but both gains and losses.
+
+
+##LIKELIHOOD--------------------------------------------------------------
+
+model{
+  
+for (i in 1:nSubjects){  
+        
+    for (c in 1:nConditions){
+        
+        for (t in 1:nTrials){    
+        
+        #PT_original - this is what was in Meder et al. 2019, prefix is simply _p       
+  
+        alph1_p[i,c,t]	= ifelse(dx1[i,c,t]>0, alphaGain_p[i], alphaLoss_p[i]) 		#set alpha to alphaGain gor positive outcomes and alphaLoss for negative
+        alph2_p[i,c,t]	= ifelse(dx2[i,c,t]>0, alphaGain_p[i], alphaLoss_p[i])
+        alph3_p[i,c,t]	= ifelse(dx3[i,c,t]>0, alphaGain_p[i], alphaLoss_p[i])
+        alph4_p[i,c,t]	= ifelse(dx4[i,c,t]>0, alphaGain_p[i], alphaLoss_p[i])
+        eadx1_p[i,c,t] 	= pow(adx1[i,c,t],alph1_p[i,c,t]) 				#exponentiate absolute value of outcome by alpha       
+        eadx2_p[i,c,t]	= pow(adx2[i,c,t],alph2_p[i,c,t])
+        eadx3_p[i,c,t]	= pow(adx3[i,c,t],alph3_p[i,c,t])
+        eadx4_p[i,c,t]	= pow(adx4[i,c,t],alph4_p[i,c,t])
+        u1_p[i,c,t]	= lamb1[i,c,t] *  eadx1_p[i,c,t] 				#multiply by lambda variable, lamb is negative for neg outcomes, and 1 for pos outcomes
+        u2_p[i,c,t]	= lamb2[i,c,t] *  eadx2_p[i,c,t]
+        u3_p[i,c,t]	= lamb3[i,c,t] *  eadx3_p[i,c,t]
+        u4_p[i,c,t]	= lamb4[i,c,t] *  eadx4_p[i,c,t]
+        eug1_p[i,c,t]	= (u1_p[i,c,t]+u2_p[i,c,t])/2  					#calculate mean utility for gamble
+        eug2_p[i,c,t]	= (u3_p[i,c,t]+u4_p[i,c,t])/2                   
+        deu_p[i,c,t] 	= eug1_p[i,c,t]-eug2_p[i,c,t] 					#difference in expected util        
+        sdeu_p[i,c,t] 	= -1 * beta_p[i,c] * deu_p[i,c,t] 				#sensitivity-scaled difference in eu      
+        tmp_p[i,c,t] 	= (1)/(1+(exp(sdeu_p[i,c,t]))) 					#choice probability       
+        theta[i,c,t,2]	= max(0.000001,min(0.999999,tmp_p[i,c,t])) 			#ensure 0 < cp < 1, accommodates parameter expansion for z
+        theta[i,c,t,4] 	= max(0.000001,min(0.999999,tmp_p[i,c,t])) 
+        theta[i,c,t,6] 	= max(0.000001,min(0.999999,tmp_p[i,c,t])) 
+        theta[i,c,t,8]	= max(0.000001,min(0.999999,tmp_p[i,c,t])) 
+
+  
+        #PT_weighted_gain - this is the suggestion of Wakker et. al, prefix is _pg  (prospect theory gain only)
+    
+        alph1_pg[i,c,t]	= alphaGain_pg[i]						#set alpha to alphaGain as everything is considered gains
+        alph2_pg[i,c,t]	= alphaGain_pg[i] 
+        alph3_pg[i,c,t]	= alphaGain_pg[i]
+        alph4_pg[i,c,t]	= alphaGain_pg[i]       
+        u1_pg[i,c,t]	= pow(w1[i,c,t],alph1_pg[i,c,t]) 				#prospect gain utility, computed by exponentiating current wealth by alpha       
+        u2_pg[i,c,t] 	= pow(w2[i,c,t],alph2_pg[i,c,t])
+        u3_pg[i,c,t] 	= pow(w3[i,c,t],alph3_pg[i,c,t])
+        u4_pg[i,c,t] 	= pow(w4[i,c,t],alph4_pg[i,c,t])
+	eu1_pg[i,c,t]	= ifelse(dx1[i,c,t]>dx2[i,c,t], (w_pg[i]*u1_pg[i,c,t]) + ((1-w_pg[i])*u2_pg[i,c,t])  , ((1-w_pg[i])*u1_pg[i,c,t]) + (w_pg[i]*u2_pg[i,c,t])  ) #calculate probability weighted utility for gambles
+	eu2_pg[i,c,t]	= ifelse(dx3[i,c,t]>dx4[i,c,t], (w_pg[i]*u3_pg[i,c,t]) + ((1-w_pg[i])*u4_pg[i,c,t])  , ((1-w_pg[i])*u3_pg[i,c,t]) + (w_pg[i]*u4_pg[i,c,t])  ) 
+        deu_pg[i,c,t] 	= eu1_pg[i,c,t] - eu2_pg [i,c,t] 				#difference in expected util        
+        sdeu_pg[i,c,t]	= -1 * beta_pg[i,c] * deu_pg[i,c,t] 				# sensitivity-scaled difference in eu
+        tmp_pg[i,c,t] 	= (1)/(1+(exp(sdeu_pg[i,c,t]))) 				# choice probability
+        theta[i,c,t,1]	= max(0.000001,min(0.999999, tmp_pg[i,c,t])) 			# ensure 0 < cp < 1, accommodates parameter expansion for z
+        theta[i,c,t,3]	= max(0.000001,min(0.999999, tmp_pg[i,c,t])) 
+        theta[i,c,t,5]	= max(0.000001,min(0.999999, tmp_pg [i,c,t])) 
+        theta[i,c,t,7]	= max(0.000001,min(0.999999, tmp_pg [i,c,t]))
+
+
+        #Choice
+
+        y[i,c,t]	~ dbern(theta[i,c,t,z[i]]) 
+
+
+	#Lambdas
+
+        lamb1[i,c,t]	= ifelse(dx1[i,c,t]>0, 1, -1 * lambda_p[i]) #risk aversion parameter - set to 1 for positive outcomes, otherwise it is the negative value that is set by lambda
+        lamb2[i,c,t]	= ifelse(dx2[i,c,t]>0, 1, -1 * lambda_p[i])
+        lamb3[i,c,t]	= ifelse(dx3[i,c,t]>0, 1, -1 * lambda_p[i])
+        lamb4[i,c,t]	= ifelse(dx4[i,c,t]>0, 1, -1 * lambda_p[i])
+
+
+	#Update wealths
+
+    	w1[i,c,t]	= wealths[c,i]+dx1[i,c,t] #compute wealth after the outcome
+        w2[i,c,t]	= wealths[c,i]+dx2[i,c,t] 
+        w3[i,c,t]	= wealths[c,i]+dx3[i,c,t]
+        w4[i,c,t]	= wealths[c,i]+dx4[i,c,t] 
+
+        }# end of trials 
+     
+     }# end of conditions
+ 
+}# end of subjects
+
+##PRIORS----------------------------------------------------------------
+
+#Subjective probability weights
+
+for (i in 1:nSubjects) {
+
+	w_pg[i] ~ dbeta(weight_a_pg, weight_b_pg)
+
+}# end of subjects
+
+
+#Indicator variables 
+
+#the model indicator variable z can take on any value from 1:n, and is subject to two stochastic processes, to prevent getting stuck
+#the n values map onto just 3 models, and is simply a means of obtaining parameter expansion for the model indication
+
+for (i in 1:nSubjects){ 
+   
+	px_z1[i]    ~ dcat(pz[])                                  #parameter expansion variable for z, takes on integers 1:n with equal probability
+	px_z2[i]    ~ dcat(pz[])                                 
+	delta_z1[i] = px_z2[i]-1                                  #parameter expansion variable for z, takes on integers 0:n-1 with equal probability
+	sum_z[i]    = px_z1[i]+delta_z1[i]                        #sum takes on integers 1:2*n -1 with equal probability
+	z[i]        = (sum_z[i] - (8 * trunc(sum_z[i]/8))) + 1    #modulo n, adding 1 to return to values 1 to 8
+
+}       
+
+#Submodels
+
+for (i in 1:nSubjects){			
+        
+        for (c in 1:nConditions){   
+        
+        	#PT_original
+        
+		beta_p[i,c]            = exp(log_beta_p[i,c])                          # transforms from logspace, now lognormally distributed prior
+        	log_beta_p[i,c]        ~ dnorm(mu_log_beta_p[c], tau_log_beta_p[c])  # log beta_lin sampled from normal hyperprior
+
+
+        	#PT_weighted_gain
+        
+		beta_pg[i,c]           = exp(log_beta_pg[i,c])           			
+        	log_beta_pg[i,c]       ~ dnorm(mu_log_beta_pg[c], tau_log_beta_pg[c])   	
+
+	
+	}#end of conditions
+
+       
+	#PT_original
+
+	alphaGain_p[i]         = exp(log_alphaGain_p[i])                         #alphaGain for 1st session sampled from log-normal dist.
+    	log_alphaGain_p[i]     ~ dnorm(mu_log_alphaGain_p, tau_log_alphaGain_p)  #log alphaGain sampled from normal dist.
+    	alphaLoss_p[i]         = exp(log_alphaLoss_p[i])                         #alphaLoss for 1st session sampled from log-normal dist.
+    	log_alphaLoss_p[i]     ~ dnorm(mu_log_alphaLoss_p, tau_log_alphaLoss_p)  #log alphaLoss sampled from normal dist.
+    	lambda_p[i]            = exp(log_lambda_p[i])                    
+    	log_lambda_p[i]        ~ dnorm(mu_log_lambda_p, tau_log_lambda_p)  
+
+
+	#PT_weighted_gain
+	
+	alphaGain_pg[i]        = exp(log_alphaGain_pg[i])                       
+	log_alphaGain_pg[i]    ~ dnorm(mu_log_alphaGain_pg, tau_log_alphaGain_pg)
+
+
+}#end of subjects
+
+
+##HYPERPRIORS----------------------------------------------------------------
+
+
+#Condition-specific hyperpriors
+
+for (c in 1:nConditions){
+
+	#PT_original
+
+	mu_log_beta_p[c]        ~ dunif(muLogBetaL,muLogBetaU)  
+	tau_log_beta_p[c]       = pow(sigma_log_beta_p[c],-2)
+	sigma_log_beta_p[c]     ~ dunif(sigmaLogBetaL,sigmaLogBetaU)         
+
+
+	#PT_weighted_gain
+	
+	mu_log_beta_pg[c]       ~ dunif(muLogBetaL,muLogBetaU)  
+	tau_log_beta_pg[c]      = pow(sigma_log_beta_pg[c],-2)
+	sigma_log_beta_pg[c]    ~ dunif(sigmaLogBetaL,sigmaLogBetaU)         
+       
+} #end of conditions
+
+
+#PT_original 
+	
+	#alphaGain paramenter
+       	
+	mu_log_alphaGain_p 	~ dunif(muLogAlphaL,muLogAlphaU)       	#prior on mean of dist. of log alphaGain
+       	tau_log_alphaGain_p	= pow(sigma_log_alphaGain_p,-2) 	#prior on precision of log alphaGain 
+       	sigma_log_alphaGain_p 	~ dunif(sigmaLogAlphaL, sigmaLogAlphaU)
+
+	
+	#alphaLoss parameter                
+	
+	mu_log_alphaLoss_p 	~ dunif(muLogAlphaL,muLogAlphaU)	#prior on mean of dist. of log alphaLoss
+	tau_log_alphaLoss_p 	= pow(sigma_log_alphaLoss_p,-2)		#prior on precision of log alphaLoss 
+	sigma_log_alphaLoss_p	~ dunif(sigmaLogAlphaL,sigmaLogAlphaU) 	#prior on std of dist. of log alphaLoss  
+
+
+	#lambda parameter
+        
+	mu_log_lambda_p		~ dunif(muLogLambdaL,muLogLambdaU)       #prior on mean of dist. of log lambda
+	tau_log_lambda_p      	= pow(sigma_log_lambda_p,-2)               #prior on precision of dist. of log lambda
+	sigma_log_lambda_p     	~ dunif(sigmaLogLambdaL,sigmaLogLambdaU) #prior on std of dist. of log lambda
+
+
+#PT_weighted_gain
+	
+	#alphaGain paramenter
+	
+	mu_log_alphaGain_pg	~ dunif(muLogAlphaL,muLogAlphaU)       
+	tau_log_alphaGain_pg	= pow(sigma_log_alphaGain_pg,-2)	 
+	sigma_log_alphaGain_pg 	~ dunif(sigmaLogAlphaL, sigmaLogAlphaU)   
+
+	
+	#subjective probability weight parameters
+    	
+	weight_a_pg	        ~ dunif(1,5)  #the 'a' parameter of the beta distribution for the probability weights
+    	weight_b_pg	        ~ dunif(1,5) #the 'b' parameter of the beta distribution for the probability weights
+    
+
+
+##DATA PROCESSING----------------------------------------------------------------
+
+	#compute absolute values of outcomes
+
+	adx1                    = abs(dx1)	#outcome 1
+	adx2                    = abs(dx2)	#outcome 2
+	adx3                    = abs(dx3)	#outcome 3   
+	adx4                    = abs(dx4)	#outcome 4
+
+}
